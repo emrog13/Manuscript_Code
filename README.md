@@ -1,1 +1,1 @@
-Code used in the following submitted and published manuscripts
+Code used in the following submitted or published manuscripts
