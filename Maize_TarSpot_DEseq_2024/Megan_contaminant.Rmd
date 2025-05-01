@@ -1,0 +1,88 @@
+---
+title: "Visualization of Megan output"
+author: "Emily Roggenkamp"
+date: "2025-05-01"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+```{r}
+myData <- read.table("Comparison.megan-chart", header = TRUE, check.names = FALSE)
+names(myData) <- c("Phylum", "10 day unexp rep1", "10 dpe rep1", "10 dpe rep3", "10 dpe rep2", "10 day unexp rep3", "24 day unexp rep3","24 day unexp rep1", "10 day unexp rep2", "24 day unexp rep2", "24 dpe rep1", "24 dpe rep2", "24 dpe rep3")
+megan.df <- t(myData)
+megan.df <- pivot_longer(data = myData, 
+                      cols = -Phylum,
+                      names_to = "samples", 
+                      values_to = "reads")
+```
+```{r}
+
+ggplot(megan.df, aes(x = samples, y = reads, 
+             fill = Phylum, color = Phylum)) + 
+  geom_col()
+"#39558CFF" "#74D055FF"
+```
+
+# Supplemental Figure 1
+
+```{r}
+megan_p1 <- ggplot(megan.df, aes(x = samples, y = reads, 
+             fill = Phylum, color = Phylum)) + 
+  geom_col() +
+  scale_color_manual(name = "Phylum",
+                     values = c(#"#bdbdbd", "#969696", "#737373", 
+                                "#525252",
+                                "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", #micro_purple
+                                "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", #micro_blue
+                                "#a1d99b", "#74c476", "#41ab5d", "#238b45", #micro_green
+                                "#feeda0", "#fdae6b", "#fe9929", "#ff7f00", #micro_orange
+                                "#CAA995", "#B78560", "#9E5C00", "#7D3200"),
+                     breaks = c("Bacteroidetes","Proteobacteria","Chlamydiae","Actinobacteria","Firmicutes",
+                               "Euryarchaeota","Evosea","Preaxostyla","Ascomycota","Basidiomycota",
+                               "Mucoromycota","Chordata","Nematoda","Arthropoda","Rotifera",
+                               "Apicomplexa","Ciliophora","Streptophyta","Kitrinoviricota","Pisuviricota",
+                               "Nucleocytoviricota")) +
+  scale_fill_manual(name = "Phylum", 
+                    values = c(#"#bdbdbd", "#969696", "#737373", 
+                               "#525252",
+                                "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", #micro_purple
+                                "#c6dbef", "#9ecae1", "#6baed6", "#4292c6", #micro_blue
+                                "#a1d99b", "#74c476", "#41ab5d", "#238b45", #micro_green
+                                "#feeda0", "#fdae6b", "#fe9929", "#ff7f00", #micro_orange
+                                "#CAA995", "#B78560", "#9E5C00", "#7D3200"),
+                    breaks = c("Bacteroidetes","Proteobacteria","Chlamydiae","Actinobacteria","Firmicutes",
+                               "Euryarchaeota","Evosea","Preaxostyla","Ascomycota","Basidiomycota",
+                               "Mucoromycota","Chordata","Nematoda","Arthropoda","Rotifera",
+                               "Apicomplexa","Ciliophora","Streptophyta","Kitrinoviricota","Pisuviricota",
+                               "Nucleocytoviricota")) +
+#  scale_color_manual(name = "Class",
+#                     values = col_vector) +
+#  scale_fill_manual(name = "Class", 
+#                    values = col_vector) +
+  scale_x_discrete(name = "Sample", 
+                   limit = c("10 day unexp rep1","10 day unexp rep2","10 day unexp rep3",
+                                      "24 day unexp rep1","24 day unexp rep2","24 day unexp rep3",    
+                                      "10 dpe rep1","10 dpe rep2","10 dpe rep3",
+                                      "24 dpe rep1","24 dpe rep2","24 dpe rep3")) +
+  scale_y_continuous(name = "Number of Reads",
+                     labels = scales::comma,
+                     expand = c(0,0))+
+                     #expand = c(0,0)) +
+  theme(axis.text = element_text(size = 10), axis.title = element_text(size = 10), 
+        strip.text = element_text(size = 10), plot.title = element_text(size = 10),
+        legend.text = element_text(size = 8), legend.title = element_text(size=10),
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  guides(color = guide_legend(nrow = 11))
+
+megan _p1
+```
+
+```{r}
+ggsave(plot = megan_p1, filename = "megan.png", units = "mm", width = 156, height = 105, dpi = 600)
+```

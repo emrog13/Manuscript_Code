@@ -1,0 +1,366 @@
+---
+title: "Maize-Phyllachora maydis RNAseq"
+author: "Emily Roggenkamp"
+date: "2024-05-01"
+output: html_document
+---
+
+
+```{r}
+rm(list=ls()) 
+setwd("C:/Users/emrog/OneDrive - Michigan State University/Chilvers/Tar spot/Corn resistance/Maize_RNAseq") 
+```
+
+Input Files from HTseq count output
+
+```{r}
+myFiles <- list.files(pattern=glob2rx("*htseq.tsv"), # Create a vector containing the names of your files
+                      all.files=T, 
+                      full.names=F)
+
+myFiles 
+
+myData <- lapply(myFiles, # Use list apply to apply the native R function read.table() to myFiles.
+                 read.table, colClasses=c("character","numeric"))
+
+names(myData) <- c("early_control_rep1", # Name the elements of myData.
+                   "early_control_rep2",
+                   "early_control_rep3",
+                   "early_infected_rep1",
+                   "early_infected_rep2",
+                   "early_infected_rep3",
+                   "late_control_rep1", 
+                   "late_control_rep2",
+                   "late_control_rep3",
+                   "late_infected_rep1", 
+                   "late_infected_rep2",
+                   "late_infected_rep3")
+
+```
+
+Remove bottom summary lines. This is a really quick and dirty solution. This is a function to select the first 44,303 lines.
+
+```{r}
+rmLines <- function(x){ 
+  x <- x[1:44303,]
+}
+
+myData <- lapply(myData, rmLines) # Apply the rmLines() function to each object in the myData list.
+
+nrow(myData$early_control_rep2) # Check to see how many lines there are in each element of myData now. There should be only 42,189.
+```
+
+Generate combined data frame for counts data
+
+```{r}
+counts <- data.frame(row.names=myData$early_control_rep1[,1],
+                      early_control_rep1=myData$early_control_rep1[,2],
+                      early_control_rep2=myData$early_control_rep2[,2],
+                      early_control_rep3=myData$early_control_rep3[,2],
+                      early_infected_rep1=myData$early_infected_rep1[,2],
+                      early_infected_rep2=myData$early_infected_rep2[,2],
+                      early_infected_rep3=myData$early_infected_rep3[,2],
+                      late_control_rep1=myData$late_control_rep1[,2],
+                      late_control_rep2=myData$late_control_rep2[,2],
+                      late_control_rep3=myData$late_control_rep3[,2],
+                      late_infected_rep1=myData$late_infected_rep1[,2],
+                      late_infected_rep2=myData$late_infected_rep2[,2],
+                      late_infected_rep3=myData$late_infected_rep3[,2]
+)
+
+head(counts)
+#write.table(counts, file="raw_counts.txt", quote=F, sep="\t")
+```
+
+```{r}
+geneTotals <- rowSums(counts) # Evaluate the sum of each row and save to a new vector called geneTotals.
+
+countsNonZero <- counts[geneTotals>0,] # Subset the rows where the geneTotal is greater than 0.
+
+nrow(countsNonZero) # See how many genes are left in the analysis.
+treatments <- data.frame(c(rep("10day_unexposed", 3), rep("10day_exposed", 3), 
+                           rep("24day_unexposed", 3), rep("24day_exposed", 3)))
+treatments$treatment <- as.factor(c("unexposed","unexposed","unexposed","exposed","exposed","exposed",
+                          "unexposed","unexposed","unexposed","exposed","exposed","exposed"))
+treatments$time <- as.factor(c("10day","10day","10day","10day","10day","10day",
+                               "24day","24day","24day","24day","24day","24day"))
+names(treatments) <- c("sample", "treatment", "time")
+rownames(treatments) <- c("early_control_rep1",
+                   "early_control_rep2",
+                   "early_control_rep3",
+                   "early_infected_rep1",
+                   "early_infected_rep2",
+                   "early_infected_rep3",
+                   "late_control_rep1", 
+                   "late_control_rep2",
+                   "late_control_rep3",
+                   "late_infected_rep1", 
+                   "late_infected_rep2",
+                   "late_infected_rep3")
+
+# We will define the 6 columns of our data set according to their treatment type, the factor in this experiment.
+```
+
+Install and Load packages
+
+```{r, echo = FALSE, results = "hide"}
+#install.packages("BiocManager")
+#BiocManager::install(c("limma","edgeR","DESeq2","EnhancedVolcano","DEGreport"))
+library(DEGreport)
+library(EnhancedVolcano)
+library(apeglm)
+library(limma) # load the packages we need next
+library(edgeR)
+library(DESeq2)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+```{r}
+colData <- DataFrame(treatments) # treatments was our column labels organized as factors
+```
+
+Create the DESeq object from the counts matrix we made that has no non-expressed genes, uses the new colData object we made to label the tissues, and the same experimental design using treatments as the nominal categories.
+
+This Model allows me to make the contrasts I want from the same object. Still trying to figure out if there's a way to do this in a formula with both "conditions" like below. Also using these thresholds, I get a lot less DEGs.
+
+Found making complicated model was difficult and didn't provide contrasts based on treatment at each time separately. Combining the treatment_time conditions into the sample factor allowed me to make those contrasts.
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countsNonZero, 
+                              colData=colData, 
+                              design=formula(~sample))
+```
+
+Pull out normalized counts for later
+```{r, Normalization}
+dds_norm <- estimateSizeFactors(dds)
+sizeFactors(dds_norm)
+normalized_counts <- counts(dds_norm, normalized=TRUE)
+```
+
+```{r}
+dds <- DESeq(dds)
+res_all <- results(dds)
+res_all <- res_all[!(is.na(res_all$padj)),]
+sigGenesadj <- as.data.frame(res_all[res_all$padj < 0.05, ])
+```
+
+```{r}
+res10 <- results(dds, contrast = c("sample", "10day_exposed", "10day_unexposed"), 
+                 alpha = 0.05, lfcThreshold = 1)
+res24 <- results(dds, contrast = c("sample", "24day_exposed", "24day_unexposed"), 
+                 alpha = 0.05, lfcThreshold = 1)
+res10 <- res10[!(is.na(res10$padj)),]
+res24 <- res24[!(is.na(res24$padj)),]
+sigGenes10 <- as.data.frame(res10[res10$padj < 0.05, ])
+sigGenes24 <- as.data.frame(res24[res24$padj < 0.05, ])
+sigGenes10$ensembl_gene_id <- rownames(sigGenes10) 
+sigGenes24$ensembl_gene_id <- rownames(sigGenes24)
+sigGenes10 <- subset(sigGenes10, select = c(7,1,2,3,4,5,6))
+sigGenes24 <- subset(sigGenes24, select = c(7,1,2,3,4,5,6))
+#write.table(sigGenes10, file="DEG_10dpe_0501.txt", quote=F, sep="\t", col.names=NA)
+#write.table(sigGenes24, file="DEG_24dpe_0501.txt", quote=F, sep="\t", col.names=NA)
+```
+
+# Figure 2A
+
+Look at numbers of DEGs up and down regulated at each timepoint and put into a bar graph
+
+```{r}
+summary(res10)
+summary(res24)
+```
+
+```{r}
+groupA <- tibble(up = 999, down = 2161)
+groupB <- tibble(up = 1543, down = 2410)
+
+all <- bind_rows(
+  mutate(groupA, group = "10dpe"),
+  mutate(groupB, group = "24dpe")
+) %>% 
+  pivot_longer(up:down)
+```
+
+```{r}
+deg <- 
+ggplot(all, aes(x = value, y = group, fill = name)) +
+  geom_col(position = position_dodge()) +
+  geom_text(aes(label=value), vjust=1.6, position = position_dodge(0.9), color="white", size=3.5) +
+  theme_classic() +
+  xlab("Number of DEGs") +
+  ylab(NULL) +
+  guides(fill = guide_legend(reverse=TRUE)) +
+  scale_fill_manual(labels = c("Down-Regulated", "Up-Regulated"), values = c("#39558CFF","#74D055FF")) +
+  theme(axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        axis.text = element_text(size = 10),
+        legend.title = element_blank(),
+        legend.position = "bottom") +
+  coord_flip()
+
+deg
+
+#ggsave(plot = deg, filename = "deg2.png", units = "mm", width = 78, height = 78, dpi = 600)
+```
+
+# Figure 2B
+
+Ouput DEGs at each timepoint and input into online portal to find overlap.
+
+```{r}
+#deg_overlap <- merge(sigGenes10, sigGenes24, by.x = "gene", by.y = "gene")
+#deg_overlap <- deg_overlap[,1:23]
+#write.csv(deg_overlap, file="DEG_both.csv")
+```
+
+# PCA Plot - Supplemental Figure 1A
+
+```{r}
+tdds <- DESeqTransform(dds)
+PCA <- plotPCA(tdds, intgroup = c("sample")) +
+  geom_point(aes(size=4)) +
+    scale_colour_manual(name = "Sample Type", values = c("#6a51a3",
+                                "#4292c6",
+                                "#238b45",
+                                "#ff7f00")) +
+  #scale_color_viridis(discrete=TRUE) if wanting to use viridis palettes
+    theme_classic() +
+    theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5)) +
+    theme(axis.title = element_text(angle = 0, size = 12, face = "bold")) +
+    theme(axis.text.x = element_text(angle = 0, size = 12,hjust = 0.5, vjust = 0.5)) +
+    theme(axis.text.y = element_text(angle = 0, size = 12, hjust = 0.5, vjust = 0.5)) +
+    theme(legend.title = element_text(size = 12, face = "bold"), 
+          legend.text = element_text(size = 12)) +
+  guides(fill = "none", color = guide_legend(nrow = 4, override.aes = list(size=5)), size = "none")
+PCA
+```
+
+Variance Stabilization
+
+```{r}
+p_mean_sd_scaled <- 
+  countsNonZero %>% 
+  as.data.frame() %>% 
+  rownames_to_column("gene") %>% 
+  pivot_longer(cols = - gene, names_to = "sample", values_to = "counts") %>% 
+  group_by(gene) %>% 
+  summarise(gene_average = mean(counts), gene_stdev = sd(counts)) %>% 
+  ungroup() %>% 
+  ggplot(., aes(x = log10(gene_average), y = log10(gene_stdev))) +
+  geom_point(alpha = 0.5, fill = "grey", colour = "black") +
+  labs(x = "Gene count average (log10 scale)",
+       y = "Gene count standard deviation (log10 scale)") +
+  ggtitle("Mean - Standard deviation relationship\n(no variance stabilisation ")
+p_mean_sd_scaled
+```
+
+```{r}
+vsd <- varianceStabilizingTransformation(object = dds, 
+                                               blind = TRUE,           # do not take the design formula into account
+                                               fitType = "parametric")
+variance_stabilised_counts <- assay(vsd)
+p_mean_sd_vst <- 
+  variance_stabilised_counts %>% 
+  as.data.frame() %>% 
+  rownames_to_column("gene") %>% 
+  pivot_longer(cols = - gene, names_to = "sample", values_to = "counts") %>% 
+  group_by(gene) %>% 
+  summarise(gene_average = mean(counts), gene_stdev = sd(counts)) %>% 
+  ungroup() %>% 
+  ggplot(., aes(x = gene_average, y = gene_stdev)) +
+  geom_point(alpha = 0.5, fill = "grey", colour = "black") +
+  labs(x = "Gene count average (variance stabilised)", 
+       y = "Gene count standard deviation (variance stabilised)") +
+  ggtitle("Mean - Standard deviation relationship\n(after variance stabilisation ")
+p_mean_sd_vst
+
+```
+
+Dispersion
+
+```{r}
+geneDispersion <- dds@rowRanges@elementMetadata@listData$dispGeneEst
+treatmentsx <- dds@rowRanges@elementMetadata@listData$sample_10dpe_infected_vs_10dpe_control
+
+plot(treatmentsx, # See how fold change corresponds to dispersion.
+     geneDispersion, 
+     xlab="Fold Change Expression", ylab="Gene Dispersion Estimate", pch=19, cex=0.4)
+
+# Want low dispersion and low fold change
+
+plotDispEsts(dds) # Check the trend of normalized counts to see how it corresponds to the dispersion estimate.
+```
+# Volcano Plots
+
+10 dpe
+
+```{r}
+resLFC <- lfcShrink(dds = dds,
+                  res = res10,
+                  type = "apeglm",
+                  coef = "sample_10day_exposed_vs_10day_unexposed")
+
+EnhancedVolcano(resLFC,
+                x = "log2FoldChange",
+                y = "padj",
+                lab = rownames(resLFC),
+                xlim = c(-15, +15),
+                ylim = c(0,150),
+                pCutoff = 1e-08,
+                FCcutoff = 4, 
+                title = "Phyllachora maydis 10dpe"
+                )
+
+```
+
+24 dpe
+
+```{r}
+resLFC2 <- lfcShrink(dds = dds,
+                  res = res24,
+                  type = "apeglm",
+                  coef = "sample_24day_exposed_vs_24day_unexposed")
+
+EnhancedVolcano(resLFC2,
+                x = "log2FoldChange",
+                y = "padj",
+                lab = rownames(resLFC),
+                xlim = c(-15, +15),
+                ylim = c(0,150),
+                pCutoff = 1e-08,
+                FCcutoff = 4, 
+                title = "Phyllachora maydis 24dpe"
+                )
+
+```
+
+# Supplemental Figure 1B
+
+Pearson's correlation coefficients of log fold change.
+
+```{r}
+corResult <- cor(t(as.matrix(dds@assays@data$counts[res_all$padj < 0.01,]))) 
+corr_coeff <- cor(dds@assays@data$counts, method = "pearson")
+
+Pearsons1 <- as.matrix(corr_coeff) %>%
+pheatmap::pheatmap(., 
+                   color = viridis(50, direction = -1),
+                   main = "Pearson correlation",
+                   cluster_rows = T, cluster_cols = T,
+                   labels_row = c("10day unexposed-1","10day unexposed-2",
+                                  "10day unexposed-3",
+                                  "10dpe-1","10dpe-2","10dpe-3",
+                                  "24day unexposed-1","24day unexposed-2",
+                                  "24day unexposed-3",
+                                  "24dpe-1","24dpe-2","24dpe-3"),
+                   show_colnames = FALSE,
+                   display_numbers = round(corr_coeff, 2), number_color = "white"
+                   )
+```
+
+

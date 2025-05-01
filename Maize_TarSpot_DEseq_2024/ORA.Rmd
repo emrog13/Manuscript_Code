@@ -1,0 +1,225 @@
+---
+title: "GO ORA"
+author: "Emily Roggenkamp"
+date: "2025-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls()) 
+setwd("C:/Users/emrog/OneDrive - Michigan State University/Chilvers/Tar spot/Corn resistance/Maize_RNAseq")
+```
+
+### Over Representation Analysis
+
+Looking at over representated terms for your significant and highly differentially expressed genes.
+
+Input DEGs from tables
+
+Install and Load packages
+
+```{r, echo = FALSE, results = "hide"}
+#install.packages("BiocManager")
+#BiocManager::install(c("limma","edgeR","DESeq2","EnhancedVolcano","DEGreport"))
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(clusterProfiler)
+library(tidyverse)
+library(enrichplot)
+library(biomaRt)
+library(viridis)
+```
+
+Using results from DEseq Rmd
+
+```{r}
+res10 <- results(dds, contrast = c("sample", "10day_exposed", "10day_unexposed"), 
+                 alpha = 0.05, lfcThreshold = 1)
+res24 <- results(dds, contrast = c("sample", "24day_exposed", "24day_unexposed"), 
+                 alpha = 0.05, lfcThreshold = 1)
+res10 <- res10[!(is.na(res10$padj)),]
+res24 <- res24[!(is.na(res24$padj)),]
+sigGenes10 <- as.data.frame(res10[res10$padj < 0.05, ])
+sigGenes24 <- as.data.frame(res24[res24$padj < 0.05, ])
+sigGenes10$ensembl_gene_id <- rownames(sigGenes10) 
+sigGenes24$ensembl_gene_id <- rownames(sigGenes24)
+sigGenes10 <- subset(sigGenes10, select = c(7,1,2,3,4,5,6))
+sigGenes24 <- subset(sigGenes24, select = c(7,1,2,3,4,5,6))
+```
+
+Making log2foldchange and gene lists
+```{r}
+deg_24dpe_lfc <- sigGenes24$log2FoldChange
+names(deg_24dpe_lfc) <- sigGenes24$ensembl_gene_id
+gene_24_list <- na.omit(deg_24dpe_lfc)
+gene_24_list <- sort(gene_24_list, decreasing = TRUE)
+deg_10dpe_lfc <- sigGenes10$log2FoldChange
+names(deg_10dpe_lfc) <- sigGenes10$ensembl_gene_id
+gene_10_list <- na.omit(deg_10dpe_lfc)
+gene_10_list <- sort(gene_10_list, decreasing = TRUE)
+```
+
+Getting GO terms for Ensembl Gene IDs from biomart
+```{r}
+EPgenes <- useMart(biomart="plants_mart", host="https://plants.ensembl.org", dataset="zmays_eg_gene")
+go.all <- getBM(attributes = c("ensembl_gene_id", "entrezgene_id", 
+                               "go_id", "name_1006", "definition_1006", 
+                               "go_linkage_type", "namespace_1003"), 
+                mart=EPgenes)
+go.all <- go.all[go.all$go_id != "", ]
+sum(!duplicated(go.all$ensembl_gene_id) )
+```
+```{r}
+#Looking for go terms without descriptions and manually updating if necessary, search for the GO terms to know what they are
+go.sub <- go.all[go.all$namespace_1003 == "",]
+go.all[go.all$go_id == "GO:0010091", "namespace_1003"] <- "biological_process"
+go.all[go.all$go_id == "GO:0010091", "name_1006"] <- "trichome branching"
+go.all[go.all$go_id == "GO:0140993", "namespace_1003"] <- "molecular_function"
+go.all[go.all$go_id == "GO:0140993", "name_1006"] <- "histone modifying activity"
+go.all[go.all$go_id == "GO:0140964", "namespace_1003"] <- "biological_process"
+go.all[go.all$go_id == "GO:0140964", "name_1006"] <- "intracellular auxin homeostasis"
+go.all[go.all$go_id == "GO:0141010", "namespace_1003"] <- "biological_process"
+go.all[go.all$go_id == "GO:0141010", "name_1006"] <- "transposable element silencing by siRNA-mediated DNA methylation"
+```
+
+# Gene Ontology Over Representation Analysis
+
+```{r}
+ora10 <- enricher(names(gene_10_list),
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora24 <- enricher(names(gene_24_list),
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+summary_ora_10 <- data.frame(ora10)
+summary_ora_24 <- data.frame(ora24)
+```
+
+# Dotplots - Figure 2C
+
+Combine Data for a single plot
+```{r}
+summary_ora_10$condition <- "10dpe"
+summary_ora_24$condition <- "24dpe"
+ora24_sort <- summary_ora_24[order(summary_ora_24$Description),]
+ora24_sort1 <- ora24_sort[0:20,]
+ora24_sort2 <- ora24_sort[28:43,]
+ora24_sort <- merge(ora24_sort1, ora24_sort2, all = TRUE)
+ora24_sort3 <- ora24_sort[order(ora24_sort$qvalue),]
+ora24_sort3 <- ora24_sort3[0:20,]
+ora_all <- merge(summary_ora_10, ora24_sort3, all = TRUE)
+```
+
+```{r}
+#library(DOSE)
+#ora_all$ratio <- parse_ratio(ora_all$GeneRatio)
+dot <- ggplot(data = ora_all, aes(x = condition, y = Description, 
+                        color = `p.adjust`, size = Count)) + 
+  geom_point() +
+  scale_color_viridis(option = "viridis", begin = 0.15, end = 1, limits =c(0,0.05),
+                      breaks = c(0.01,0.02,0.03,0.04)) +
+  scale_size_continuous(limits=c(0,120), breaks = c(25,50,75,100)) +
+  #scale_y_discrete(labels=function(ora_all) str_wrap(ora_all, width=50)) +
+  #coord_cartesian(xlim = c(0.2, 1.0), clip = "off") +
+  ylab("") + 
+  xlab("") + 
+  labs(color="Adj p-value", size = "Gene Count ") +
+  theme(axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        axis.text = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=8))
+
+dot
+```
+# KEGG ORA - Supplemental Figure 3?
+
+```{r}
+## Remove any NA values (reduces the data by quite a bit)
+res_entrez <- dplyr::filter(go.all, entrezgene_id != "NA")
+## Remove any Entrez duplicates
+res_entrez <- res_entrez[which(duplicated(res_entrez$entrezgene_id) == F), ]
+res_entrez_10 <- merge(sigGenes10, res_entrez, by.x = "ensembl_gene_id")
+res_entrez_24 <- merge(sigGenes24, res_entrez, by.x = "ensembl_gene_id")
+```
+
+```{r}
+kegg10 <- res_entrez_10$log2FoldChange
+names(kegg10) <- res_entrez_10$entrezgene_id
+kegg10 <- sort(kegg10, decreasing = TRUE)
+kegg24 <- res_entrez_24$log2FoldChange
+names(kegg24) <- res_entrez_24$entrezgene_id
+kegg24 <- sort(kegg24, decreasing = TRUE)
+```
+
+
+```{r}
+ora_analysis_kegg24 <- enrichKEGG(gene = names(kegg24),
+                                universe = as.character(res_entrez$entrezgene_id),
+                                organism = "zma",
+                                keyType = "kegg",
+                                pAdjustMethod = "BH",
+                                pvalueCutoff = 0.5,
+                                use_internal_data = FALSE)
+ora_analysis_kegg10 <- enrichKEGG(gene = names(kegg10),
+                                universe = as.character(res_entrez$entrezgene_id),
+                                organism = "zma",
+                                keyType = "kegg",
+                                pAdjustMethod = "BH",
+                                pvalueCutoff = 0.5,
+                                use_internal_data = FALSE)
+```
+
+
+
+```{r}
+cluster_summary_10kegg <- data.frame(ora_analysis_kegg10)
+cluster_summary_24kegg <- data.frame(ora_analysis_kegg24)
+#write.csv(cluster_summary_24kegg, file="ORA24_kegg.csv")
+#write.csv(cluster_summary_10kegg, file="ORA10_kegg.csv")
+cluster_summary_10kegg$condition <- "10dpe"
+cluster_summary_24kegg$condition <- "24dpe"
+ora_kegg_all <- merge(cluster_summary_10kegg, cluster_summary_24kegg, all = TRUE)
+```
+
+```{r}
+
+dot2 <- ggplot(data = ora_kegg_all, aes(x = condition, y = Description, 
+                        color = `p.adjust`, size = Count)) + 
+  geom_point() +
+  scale_color_viridis(option = "viridis", begin = 0, end = 1) +
+  scale_size_continuous(limits=c(0,50), breaks = c(5,10,20,40)) +
+  #scale_y_discrete(labels=function(ora_all) str_wrap(ora_all, width=30)) +
+  #coord_cartesian(xlim = c(0.2, 1.0), clip = "off") +
+  ylab("") + 
+  xlab("") + 
+  labs(color="Adj p-value", size = "Gene Count") +
+  theme(axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        axis.text = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=8))
+dot2
+
+```
+
+Save Plots
+
+```{r}
+ggsave(plot = dot, filename = "dot_ora.png", units = "mm", width = 132, height = 150, dpi = 600)
+ggsave(plot = dot2, filename = "dot_kegg.png", units = "mm", width = 178, height = 178, dpi = 600)
+```
