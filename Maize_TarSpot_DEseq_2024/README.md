@@ -1,6 +1,4 @@
-Roggenkamp, E.M., Jaiswal, N., Helm, M., Thompson, A., Chilvers, M.I. 2024. Transcriptomic analysis reveals maize differential gene expression upon exposure to the maize tar spot pathogen, <i>Phyllachora maydis</i>
-
-To be submitted to PhytoFrontiers
+Roggenkamp, E.M., Jaiswal, N., Helm, M., Thompson, A., Chilvers, M.I. 2025. Survey of Maize Differential Gene Expression upon Environmental Exposure to the Tar Spot Pathogen, <i>Phyllachora maydis</i>. PhytoFrontiers. https://doi.org/10.1094/PHYTOFR-12-24-0136-R
 
 *will update with files
 
@@ -9,4 +7,4 @@ Files:
 2. R - DEseq
 3. R - GO/KEGG ORA
 4. R - Hierarchical Clustering and GRNs
-6. Data files - counts, Rdata for each file?
+6. Data files - counts
