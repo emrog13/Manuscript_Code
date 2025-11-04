@@ -7,4 +7,4 @@ Files:
 2. R - DEseq
 3. R - GO/KEGG ORA
 4. R - Hierarchical Clustering and GRNs
-6. Data files - counts
+6. Data files - counts input file can be downloaded at NCBI GEO under Series GSE296174. Supplementary file GSE296174_raw_counts.txt.gz
