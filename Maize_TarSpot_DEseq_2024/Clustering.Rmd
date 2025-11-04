@@ -1,0 +1,177 @@
+---
+title: "Hierarchical Clustering"
+author: "Emily Roggenkamp"
+date: "2024-09-26"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(viridis)
+```
+
+
+Using pheatmap on DEGs and normalized count data
+
+Use normalized_counts, sigGenes10, and sigGenes24 from DESeq Rmd
+
+```{r}
+countsg <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% row.names(sigGenes10) | row.names(normalized_counts) %in% row.names(sigGenes24))
+countsg <- as.matrix(countsg)
+
+normalized_counts_df <- normalized_counts %>% 
+                     data.frame() %>%
+                     rownames_to_column(var="gene") 
+
+norm_sig <- normalized_counts_df %>% 
+              dplyr::filter(gene %in% dimnames(countsg)[[1]])
+row.names(norm_sig) <- norm_sig$gene
+norm_wide <- data.frame(t(norm_sig[-1]))
+```
+Euclidean distance
+```{r}
+out <- pheatmap::pheatmap(norm_wide, color = viridis(100), cutree_cols = 6,
+      show_colnames=F, show_rownames=T, treeheight_row = 0, cluster_cols=T, cluster_rows=T, scale="column",
+      cex=1, clustering_distance_rows="euclidean", cex=1,
+      clustering_distance_cols="euclidean", clustering_method="complete", border_color=FALSE)
+
+out
+#ggsave(plot = out, filename = "clust.png", units = "mm", width = 178, height = 100, dpi = 600)
+```
+
+Getting clusters
+
+```{r}
+plot(out$tree_row) +
+abline(h=6, col="red", lty=2, lwd=2)
+```
+```{r}
+#norm_clust <- norm_sig[out$tree_row[["order"]],]
+norm_clust <- cutree(out$tree_row, h=6)
+norm_sig$order <- names(norm_clust)
+norm_sig$clust <- norm_clust
+clust1 <- norm_sig[norm_sig$clust == "1",]
+clust2 <- norm_sig[norm_sig$clust == "2",]
+clust3 <- norm_sig[norm_sig$clust == "3",]
+clust4 <- norm_sig[norm_sig$clust == "4",]
+clust5 <- norm_sig[norm_sig$clust == "5",]
+clust6 <- norm_sig[norm_sig$clust == "6",]
+```
+
+GO on clusters
+
+Make gene lists
+```{r}
+gene_clust1 <- clust1$gene
+gene_clust2 <- clust2$gene
+gene_clust3 <- clust3$gene
+gene_clust4 <- clust4$gene
+gene_clust5 <- clust5$gene
+gene_clust6 <- clust6$gene
+```
+
+
+
+```{r}
+ora1 <- enricher(gene_clust1,
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.01,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora2 <- enricher(gene_clust2,
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.01,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora3 <- enricher(gene_clust3,
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.01,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora4 <- enricher(gene_clust4,
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.01,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora5 <- enricher(gene_clust5,
+               minGSSize = 10,
+               maxGSSize = 500,
+               pvalueCutoff = 0.01,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+ora6 <- enricher(gene_clust6,
+               minGSSize = 5,
+               maxGSSize = 500,
+               pvalueCutoff = 0.05,
+               pAdjustMethod = "BH",
+               TERM2GENE = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","ensembl_gene_id")],
+               TERM2NAME = go.all[go.all$namespace_1003 == "biological_process",  c("go_id","name_1006")])
+summary_ora1 <- data.frame(ora1)
+summary_ora2 <- data.frame(ora2)
+summary_ora3 <- data.frame(ora3)
+summary_ora4 <- data.frame(ora4)
+summary_ora5 <- data.frame(ora5)
+summary_ora6 <- data.frame(ora6)
+```
+
+```{r}
+summary_ora1$condition <- "1"
+summary_ora2$condition <- "2"
+summary_ora3$condition <- "3"
+summary_ora4$condition <- "4"
+summary_ora5$condition <- "5"
+summary_ora6$condition <- "6"
+summary_ora1s <- summary_ora1[order(summary_ora1$qvalue),]
+summary_ora1s <- summary_ora1s[0:10,]
+summary_ora3s <- summary_ora3[order(summary_ora3$qvalue),]
+summary_ora3s <- summary_ora3s[0:10,]
+summary_ora5s <- summary_ora5[order(summary_ora5$qvalue),]
+summary_ora5s <- summary_ora5s[0:10,]
+
+ora_all <- bind_rows(summary_ora1s, summary_ora2, summary_ora3s, summary_ora4, 
+                 summary_ora5s, summary_ora6)
+ora_all %>% 
+  mutate(Description = fct_reorder2(Description, -`p.adjust`, `condition`)) ->
+  ora_all
+#library(DOSE)
+#ora_all$ratio <- parse_ratio(ora_all$GeneRatio)
+dot_clust <- ggplot(data = ora_all, aes(x = condition, y = Description, 
+                        color = `p.adjust`, size = Count)) + 
+  geom_point() +
+  scale_color_viridis(option = "viridis", begin = 0.15, end = 1, limits =c(0,0.0125),
+                      breaks = c(0.0025,0.005,0.0075,0.01)) +
+  scale_size_continuous(limits=c(0,120), breaks = c(25,50,75,100)) +
+  #scale_y_discrete(labels=function(ora_all) str_wrap(ora_all, width=50)) +
+  #coord_cartesian(xlim = c(0.2, 1.0), clip = "off") +
+  ylab("") + 
+  xlab("Cluster") + 
+  labs(color="Adj p-value", size = "Gene Count") +
+  theme(axis.title.x = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        #axis.text.x = element_text(size = 10, angle = 45, hjust = 1),
+        axis.text = element_text(size = 10),
+        legend.title=element_text(size=10),
+        legend.text=element_text(size=8))
+  #coord_flip()
+dot_clust
+```
+
+```{r}
+ggsave(plot = dot2, filename = "dot_ora.png", units = "mm", width = 178, height = 247, dpi = 600)
+ggsave(plot = dot_gsea, filename = "dot_gsea.png", units = "mm", width = 178, height = 247, dpi = 600)
+ggsave(plot = dot3, filename = "dot_kegg.png", units = "mm", width = 178, height = 178, dpi = 600)
+ggsave(plot = dot_clust, filename = "dot_clust.png", units = "mm", width = 178, height = 150, dpi = 600)
+```

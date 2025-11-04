@@ -1,0 +1,468 @@
+---
+title: "GRN with GENIE3"
+author: "Emily Roggenkamp"
+date: "2024-09-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#BiocManager::install("GENIE3")
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(GENIE3)
+library(igraph)
+library(RCy3)
+```
+
+```{r}
+library(GENIE3)
+set.seed(123) # For reproducibility of results
+countsg <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% row.names(sigGenes10) | row.names(normalized_counts) %in% row.names(sigGenes24))
+countsg <- as.matrix(countsg)
+```
+
+Input Zea mays transcription factor list. Subset for each gene cluster.
+
+```{r}
+Zm_TF <- scan("Zm_TF.txt", what = "", sep = "\n")
+Zm_TF <- unique(Zm_TF)
+Zm_TF <- as.data.frame(Zm_TF)
+Zm_TF1 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust1)
+row.names(Zm_TF1) <- Zm_TF1$Zm_TF
+Zm_TF1 <- as.vector(row.names(Zm_TF1))
+Zm_TF2 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust2)
+row.names(Zm_TF2) <- Zm_TF2$Zm_TF
+Zm_TF2 <- as.vector(row.names(Zm_TF2))
+Zm_TF3 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust3)
+row.names(Zm_TF3) <- Zm_TF3$Zm_TF
+Zm_TF3 <- as.vector(row.names(Zm_TF3))
+Zm_TF4 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust4)
+row.names(Zm_TF4) <- Zm_TF4$Zm_TF
+Zm_TF4 <- as.vector(row.names(Zm_TF4))
+Zm_TF5 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust5)
+row.names(Zm_TF5) <- Zm_TF5$Zm_TF
+Zm_TF5 <- as.vector(row.names(Zm_TF5))
+Zm_TF6 <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% gene_clust6)
+row.names(Zm_TF6) <- Zm_TF6$Zm_TF
+Zm_TF6 <- as.vector(row.names(Zm_TF6))
+```
+
+GRN for all DEGs
+```{r}
+set.seed(123) # For reproducibility of results
+Zm_TFt <- Zm_TF %>%
+  dplyr::filter(Zm_TF %in% row.names(countsg))
+row.names(Zm_TFt) <- Zm_TFt$Zm_TF
+Zm_TFt <- as.vector(row.names(Zm_TFt))
+weightMat <- GENIE3(countsg, regulators= Zm_TFt)
+```
+
+GRNs based on clusters from hierarchical clustering
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg1 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust1)
+countsg1 <- as.matrix(countsg1)
+weightMat1 <- GENIE3(countsg1, regulators= Zm_TF1)
+```
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg2 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust2)
+countsg2 <- as.matrix(countsg2)
+weightMat2 <- GENIE3(countsg2, regulators= Zm_TF2)
+```
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg3 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust3)
+countsg3 <- as.matrix(countsg3)
+weightMat3 <- GENIE3(countsg3, regulators= Zm_TF3)
+```
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg4 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust4)
+countsg4 <- as.matrix(countsg4)
+weightMat4 <- GENIE3(countsg4, regulators= Zm_TF4)
+```
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg5 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust5)
+countsg5 <- as.matrix(countsg5)
+weightMat5 <- GENIE3(countsg5, regulators= Zm_TF5)
+```
+
+```{r}
+set.seed(123) # For reproducibility of results
+countsg6 <- as.data.frame(normalized_counts) %>%
+  dplyr::filter(row.names(normalized_counts) %in% gene_clust6)
+countsg6 <- as.matrix(countsg6)
+weightMat6 <- GENIE3(countsg6, regulators= Zm_TF6)
+```
+
+```{r}
+save(normalized_counts,
+     gene_clust1, gene_clust2, gene_clust3, 
+     gene_clust4, gene_clust5, gene_clust6,
+     weightMat1, weightMat2, weightMat3, 
+     weightMat4, weightMat5, weightMat6,
+     file = "GRN_clust.RData")
+```
+
+```{r}
+save(normalized_counts, countsg,
+     weightMat, hub_clust, hub_genes, net, degree_color, 
+     file = "GRN_degs.RData")
+#load(file = "GRN_degs.RData")
+```
+
+```{r}
+load(file = "GRN_clust.RData")
+```
+
+```{r}
+linkList1 <- getLinkList(weightMat1, reportMax = 1000000)
+linkList2 <- getLinkList(weightMat2, reportMax = 1000000)
+linkList3 <- getLinkList(weightMat3)
+linkList4 <- getLinkList(weightMat4, reportMax = 1000000)
+linkList5 <- getLinkList(weightMat5, reportMax = 1000000)
+linkList6 <- getLinkList(weightMat6, reportMax = 1000000)
+```
+
+```{r}
+# Created "linked list" from a weighted adjacency_matrix
+wam_linked_list <- getLinkList(weightMatrix = weightMat) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.999))
+network_subset_df <- filter(wam_linked_list, weight > q_weight)
+colnames(network_subset_df) <- c("target", "regulator", "weight")
+
+# Create a graph from the subsetted data.frame
+net <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color) <- names(degree)
+hub_genes <- enframe(degree_color) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes) %>%
+  arrange(regulator, desc(weight))
+
+hub_clust <- hub_target_df$regulator
+hub_uniq <- unique(hub_clust)
+```
+
+```{r}
+# Created "linked list" from a weighted adjacency_matrix
+wam_linked_list <- getLinkList(weightMatrix = weightMat1) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net1 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net1, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color1 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color1) <- names(degree)
+hub_genes1 <- enframe(degree_color1) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes1) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+hub_clust1 <- hub_target_df$regulator_hub
+```
+```{r}
+# Created "linked list" from a weighted adjacency_matrix
+wam_linked_list <- getLinkList(weightMatrix = weightMat2) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net2 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net2, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color2 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color2) <- names(degree)
+hub_genes2 <- enframe(degree_color2) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes2) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+hub_clust2 <- hub_target_df$regulator_hub
+```
+```{r}
+# Created "linked list" from a weighted adjacency_matrix
+wam_linked_list <- getLinkList(weightMatrix = weightMat3) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net3 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net3, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color3 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color3) <- names(degree)
+hub_genes3 <- enframe(degree_color3) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes3) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+hub_clust3 <- hub_target_df$regulator_hub
+     
+```
+
+```{r}
+wam_linked_list <- getLinkList(weightMatrix = weightMat4) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net4 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net4, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color4 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color4) <- names(degree)
+hub_genes4 <- enframe(degree_color4) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes4) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+hub_clust4 <- hub_target_df$regulator_hub
+     
+```
+```{r}
+wam_linked_list <- getLinkList(weightMatrix = weightMat5) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net5 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net5, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color5 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color5) <- names(degree)
+hub_genes5 <- enframe(degree_color5) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes5) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+hub_clust5 <- hub_target_df$regulator_hub
+     
+```
+```{r}
+wam_linked_list <- getLinkList(weightMatrix = weightMat6) %>%
+    mutate_if(is.factor, as.character)
+# Subset edges by weight, keeping top edges
+q_weight <- quantile(wam_linked_list$weight, probs = (0.99))
+network_subset_df <- filter(wam_linked_list, weight > q_weight) %>%
+  rename(target = regulatoryGene, regulator = targetGene)
+
+# Create a graph from the subsetted data.frame
+net6 <- graph_from_data_frame(network_subset_df, directed=T)
+
+# Identify "hub" regulator genes
+degree <- degree(net6, mode="out")
+q_degree <- quantile(degree, probs = c(0.9))
+degree_color6 <- if_else(degree > q_degree, "#440154FF", "#35B779FF")
+names(degree_color6) <- names(degree)
+hub_genes6 <- enframe(degree_color6) %>% filter(value == "#440154FF") %>% pull(name)
+
+# Get a list of the genes regulated by hub genes
+hub_target_df <- network_subset_df %>%
+  filter(regulator %in% hub_genes6) %>%
+  arrange(regulator, desc(weight)) %>%
+  rename(regulator_hub = regulator)
+
+head(hub_target_df, 3)
+hub_clust6 <- hub_target_df$regulator_hub
+     
+```
+
+```{r, dpi = 600}
+png("net_deg.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net,
+    vertex.size = 2,
+    vertex.color = degree_color,
+    vertex.frame.color = degree_color,
+    vertex.label = "",#ifelse(V(net)$name %in% hub_genes, V(net)$name, NA),
+    #vertex.label.color="black",
+    #vertex.label.dist = 1.5,
+    #vertex.label.cex = 0.5,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 1)
+dev.off()
+```
+
+```{r, dpi = 600}
+png("net1.png", width = 178, height = 178, units = "mm", res = 600)
+plot(x = net1,
+    vertex.size = 6,
+    vertex.color = degree_color1,
+    vertex.frame.color = degree_color1,
+    vertex.label = ifelse(V(net1)$name %in% hub_clust1, V(net1)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 1,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
+```{r, dpi = 600}
+png("net2.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net2,
+    vertex.size = 6,
+    vertex.color = degree_color2,
+    vertex.frame.color = degree_color2,
+    vertex.label = ifelse(V(net2)$name %in% hub_genes2, V(net2)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 1,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
+```{r, dpi = 600}
+png("net32.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net3,
+    vertex.size = 6,
+    vertex.color = degree_color3,
+    vertex.frame.color = degree_color3,
+    vertex.label = ifelse(V(net3)$name %in% hub_genes3, V(net3)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 0.9,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
+```{r, dpi = 600}
+png("net4.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net4,
+    vertex.size = 6,
+    vertex.color = degree_color4,
+    vertex.frame.color = degree_color4,
+    vertex.label = ifelse(V(net4)$name %in% hub_clust4, V(net4)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 1,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
+```{r, dpi = 600}
+png("net5.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net5,
+    vertex.size = 6,
+    vertex.color = degree_color5,
+    vertex.frame.color = degree_color5,
+    vertex.label = ifelse(V(net5)$name %in% hub_genes5, V(net5)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 1,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
+```{r, dpi = 600}
+png("net6.png", width = 178, height = 178, units = "mm", res = 600)
+plot(
+    x = net6,
+    vertex.size = 6,
+    vertex.color = degree_color6,
+    vertex.frame.color = degree_color6,
+    vertex.label = ifelse(V(net6)$name %in% hub_clust6, V(net6)$name, NA),
+    vertex.label.family = "Helvetica",
+    vertex.label.font = 2,
+    vertex.label.color="black",
+    vertex.label.dist = 1.5,
+    vertex.label.cex = 1,
+    edge.color = "gray",
+    edge.arrow.size=0,
+    edge.width = 2)
+dev.off()
+```
